@@ -156,31 +156,35 @@ export async function POST(request: NextRequest) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // Generate unique filename using validated extension
-        const fileExtension = getFileExtension(file.name);
-        // Extension should exist due to validation above
-        if (!fileExtension) {
-          return NextResponse.json(
-            { error: "An error occurred while processing file uploads" },
-            { status: 500 }
-          );
-        }
+        // Generate unique filename (extension validated above, guaranteed to exist)
+        const fileExtension = getFileExtension(file.name) as string;
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = join(process.cwd(), "public", "uploads", fileName);
 
-        // Save file
-        await writeFile(filePath, buffer);
+        try {
+          // Create attachment record first
+          await prisma.attachment.create({
+            data: {
+              fileName: file.name,
+              fileUrl: `/uploads/${fileName}`,
+              fileType: "IMAGE",
+              fileSize: file.size,
+              logbookEntryId: entry.id,
+            },
+          });
 
-        // Create attachment record
-        await prisma.attachment.create({
-          data: {
-            fileName: file.name,
-            fileUrl: `/uploads/${fileName}`,
-            fileType: "IMAGE",
-            fileSize: file.size,
-            logbookEntryId: entry.id,
-          },
-        });
+          // Save file to disk after successful DB operation
+          await writeFile(filePath, buffer);
+        } catch (error) {
+          // If anything fails, try to clean up any created files
+          try {
+            const { unlink } = await import("fs/promises");
+            await unlink(filePath);
+          } catch {
+            // Ignore cleanup errors
+          }
+          throw error; // Re-throw to be caught by outer try-catch
+        }
       }
     }
 
