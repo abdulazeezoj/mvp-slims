@@ -161,9 +161,11 @@ export async function POST(request: NextRequest) {
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = join(process.cwd(), "public", "uploads", fileName);
 
-        let fileWritten = false;
         try {
-          // Create attachment record first
+          // Write file to disk first to avoid orphaned DB records
+          await writeFile(filePath, buffer);
+
+          // Create attachment record after successful file write
           await prisma.attachment.create({
             data: {
               fileName: file.name,
@@ -173,19 +175,13 @@ export async function POST(request: NextRequest) {
               logbookEntryId: entry.id,
             },
           });
-
-          // Save file to disk after successful DB operation
-          await writeFile(filePath, buffer);
-          fileWritten = true;
         } catch (error) {
-          // Clean up file only if it was successfully written
-          if (fileWritten) {
-            try {
-              const { unlink } = await import("fs/promises");
-              await unlink(filePath);
-            } catch {
-              // Ignore cleanup errors
-            }
+          // Clean up file if it was written but DB operation failed
+          try {
+            const { unlink } = await import("fs/promises");
+            await unlink(filePath);
+          } catch {
+            // Ignore cleanup errors
           }
           throw error; // Re-throw to be caught by outer try-catch
         }
