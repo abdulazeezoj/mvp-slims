@@ -83,7 +83,6 @@ export async function POST(request: NextRequest) {
       const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
       const ALLOWED_MIME_TYPES = [
         "image/jpeg",
-        "image/jpg",
         "image/png",
         "image/gif",
         "image/webp",
@@ -112,12 +111,18 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          // Validate file extension
-          const fileExtension = file.name.split(".").pop()?.toLowerCase();
-          if (
-            !fileExtension ||
-            !ALLOWED_EXTENSIONS.includes(fileExtension)
-          ) {
+          // Validate file extension - get the last extension after the final dot
+          const lastDotIndex = file.name.lastIndexOf(".");
+          if (lastDotIndex === -1) {
+            return NextResponse.json(
+              {
+                error: `File "${file.name}" has no extension. Only .jpg, .jpeg, .png, .gif, .webp are allowed`,
+              },
+              { status: 400 }
+            );
+          }
+          const fileExtension = file.name.slice(lastDotIndex + 1).toLowerCase();
+          if (!ALLOWED_EXTENSIONS.includes(fileExtension)) {
             return NextResponse.json(
               {
                 error: `File "${file.name}" has invalid extension. Only .jpg, .jpeg, .png, .gif, .webp are allowed`,
