@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(bytes);
 
         // Generate unique filename (extension validated above, guaranteed to exist)
-        const fileExtension = getFileExtension(file.name) as string;
+        const fileExtension = getFileExtension(file.name)!;
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = join(process.cwd(), "public", "uploads", fileName);
 
