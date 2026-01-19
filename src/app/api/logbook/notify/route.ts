@@ -70,13 +70,14 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
 
     // Notify industry supervisor
+    let industrySupervisorNotified = false;
     if (logbook.industrySupervisor) {
       const supervisorEmail = logbook.industrySupervisor.user.email;
       if (supervisorEmail) {
         const supervisorName = `${logbook.industrySupervisor.firstName} ${logbook.industrySupervisor.lastName}`;
         const reviewUrl = `${baseUrl}/supervisor/review/${report.id}`;
 
-        await sendEmail({
+        const emailResult = await sendEmail({
           to: supervisorEmail,
           subject: `SIWES Week ${weekNumber} Report - ${studentFullName}`,
           html: getWeeklyReportNotificationEmail(
@@ -87,21 +88,25 @@ export async function POST(request: NextRequest) {
           ),
         });
 
-        await prisma.weeklyReport.update({
-          where: { id: report.id },
-          data: { industrySupervisorNotifiedAt: new Date() },
-        });
+        if (emailResult.success) {
+          await prisma.weeklyReport.update({
+            where: { id: report.id },
+            data: { industrySupervisorNotifiedAt: new Date() },
+          });
+          industrySupervisorNotified = true;
+        }
       }
     }
 
     // Notify school supervisor
+    let schoolSupervisorNotified = false;
     if (logbook.schoolSupervisor) {
       const supervisorEmail = logbook.schoolSupervisor.user.email;
       if (supervisorEmail) {
         const supervisorName = `${logbook.schoolSupervisor.firstName} ${logbook.schoolSupervisor.lastName}`;
         const reviewUrl = `${baseUrl}/supervisor/review/${report.id}`;
 
-        await sendEmail({
+        const emailResult = await sendEmail({
           to: supervisorEmail,
           subject: `SIWES Week ${weekNumber} Report - ${studentFullName}`,
           html: getWeeklyReportNotificationEmail(
@@ -112,11 +117,53 @@ export async function POST(request: NextRequest) {
           ),
         });
 
-        await prisma.weeklyReport.update({
-          where: { id: report.id },
-          data: { schoolSupervisorNotifiedAt: new Date() },
-        });
+        if (emailResult.success) {
+          await prisma.weeklyReport.update({
+            where: { id: report.id },
+            data: { schoolSupervisorNotifiedAt: new Date() },
+          });
+          schoolSupervisorNotified = true;
+        }
       }
+    }
+
+    // Check if at least one supervisor was notified
+    const hasIndustrySupervisor = !!logbook.industrySupervisor?.user.email;
+    const hasSchoolSupervisor = !!logbook.schoolSupervisor?.user.email;
+    
+    // Check if no supervisors have emails
+    if (!hasIndustrySupervisor && !hasSchoolSupervisor) {
+      return NextResponse.json(
+        { error: "No supervisor email addresses found" },
+        { status: 400 }
+      );
+    }
+    
+    // Check for notification failures
+    if (hasIndustrySupervisor && !industrySupervisorNotified) {
+      if (hasSchoolSupervisor && !schoolSupervisorNotified) {
+        return NextResponse.json(
+          { error: "Failed to notify both supervisors" },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json(
+        { 
+          message: "School supervisor notified successfully",
+          warning: "Failed to notify industry supervisor"
+        },
+        { status: 207 }
+      );
+    }
+    
+    if (hasSchoolSupervisor && !schoolSupervisorNotified) {
+      return NextResponse.json(
+        { 
+          message: "Industry supervisor notified successfully",
+          warning: "Failed to notify school supervisor"
+        },
+        { status: 207 }
+      );
     }
 
     return NextResponse.json({
