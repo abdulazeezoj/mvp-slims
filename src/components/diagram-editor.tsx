@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,13 +29,19 @@ export function DiagramEditor({ onSave }: DiagramEditorProps) {
           format: "png",
           spinKey: "saving",
         }),
-        "*"
+        "https://embed.diagrams.net"
       );
     }
   };
 
   // Listen for messages from Draw.io
-  const handleMessage = (event: MessageEvent) => {
+  const handleMessage = useCallback((event: MessageEvent) => {
+    // Validate origin for security
+    if (event.origin !== "https://embed.diagrams.net") {
+      console.warn("Rejected postMessage from untrusted origin:", event.origin);
+      return;
+    }
+
     if (event.data && typeof event.data === "string") {
       try {
         const msg = JSON.parse(event.data);
@@ -57,7 +63,15 @@ export function DiagramEditor({ onSave }: DiagramEditorProps) {
         console.error("Error processing Draw.io message:", error);
       }
     }
-  };
+  }, [onSave]);
+
+  // Add and remove event listener with proper cleanup
+  useEffect(() => {
+    window.addEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, [handleMessage]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -79,9 +93,6 @@ export function DiagramEditor({ onSave }: DiagramEditorProps) {
             ref={iframeRef}
             src="https://embed.diagrams.net/?embed=1&ui=atlas&spin=1&proto=json"
             className="w-full h-[calc(80vh-150px)] border rounded"
-            onLoad={() => {
-              window.addEventListener("message", handleMessage);
-            }}
           />
         </div>
         <div className="flex justify-end gap-2">
