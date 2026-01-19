@@ -160,8 +160,11 @@ export async function POST(request: NextRequest) {
         const fileExtension = getFileExtension(file.name);
         // Extension should exist due to validation above, but handle gracefully
         if (!fileExtension) {
-          console.error(`Unexpected: File ${file.name} passed validation but has no extension`);
-          continue;
+          console.error(`Unexpected validation error: file with no extension passed validation`);
+          return NextResponse.json(
+            { error: "An error occurred while processing file uploads" },
+            { status: 500 }
+          );
         }
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = join(process.cwd(), "public", "uploads", fileName);
