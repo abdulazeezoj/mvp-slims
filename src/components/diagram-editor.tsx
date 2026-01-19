@@ -29,13 +29,18 @@ export function DiagramEditor({ onSave }: DiagramEditorProps) {
           format: "png",
           spinKey: "saving",
         }),
-        "*"
+        "https://embed.diagrams.net"
       );
     }
   };
 
   // Listen for messages from Draw.io
   const handleMessage = (event: MessageEvent) => {
+    // Validate origin for security
+    if (event.origin !== "https://embed.diagrams.net") {
+      return;
+    }
+
     if (event.data && typeof event.data === "string") {
       try {
         const msg = JSON.parse(event.data);
