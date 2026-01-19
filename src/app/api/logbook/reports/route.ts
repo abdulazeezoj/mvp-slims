@@ -65,19 +65,14 @@ export async function POST(request: NextRequest) {
     const { weekNumber, summary } = body;
 
     // Validate input fields
-    if (
-      weekNumber === null ||
-      weekNumber === undefined ||
-      typeof weekNumber !== "number" ||
-      !Number.isInteger(weekNumber)
-    ) {
+    if (typeof weekNumber !== "number" || !Number.isInteger(weekNumber)) {
       return NextResponse.json(
         { error: "Week number is required and must be an integer" },
         { status: 400 }
       );
     }
 
-    if (typeof summary !== "string" || !summary || summary.trim() === "") {
+    if (typeof summary !== "string" || summary.trim() === "") {
       return NextResponse.json(
         { error: "Summary is required and cannot be empty" },
         { status: 400 }
