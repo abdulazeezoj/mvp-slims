@@ -79,13 +79,57 @@ export async function POST(request: NextRequest) {
 
     // Handle file uploads
     if (files.length > 0) {
+      // Define validation constants
+      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+      const ALLOWED_MIME_TYPES = [
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+      ];
+      const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"];
+
       for (const file of files) {
         if (file.size > 0) {
+          // Validate file size
+          if (file.size > MAX_FILE_SIZE) {
+            return NextResponse.json(
+              {
+                error: `File "${file.name}" exceeds maximum size of 5MB`,
+              },
+              { status: 400 }
+            );
+          }
+
+          // Validate MIME type
+          if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+            return NextResponse.json(
+              {
+                error: `File "${file.name}" has invalid type. Only image files (JPEG, PNG, GIF, WebP) are allowed`,
+              },
+              { status: 400 }
+            );
+          }
+
+          // Validate file extension
+          const fileExtension = file.name.split(".").pop()?.toLowerCase();
+          if (
+            !fileExtension ||
+            !ALLOWED_EXTENSIONS.includes(fileExtension)
+          ) {
+            return NextResponse.json(
+              {
+                error: `File "${file.name}" has invalid extension. Only .jpg, .jpeg, .png, .gif, .webp are allowed`,
+              },
+              { status: 400 }
+            );
+          }
+
           const bytes = await file.arrayBuffer();
           const buffer = Buffer.from(bytes);
 
           // Generate unique filename
-          const fileExtension = file.name.split(".").pop();
           const fileName = `${uuidv4()}.${fileExtension}`;
           const filePath = join(process.cwd(), "public", "uploads", fileName);
 
