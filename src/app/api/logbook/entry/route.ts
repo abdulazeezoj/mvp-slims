@@ -16,6 +16,16 @@ function getFileExtension(fileName: string): string | null {
   return fileName.slice(lastDotIndex + 1).toLowerCase();
 }
 
+// File upload validation constants
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"];
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -76,16 +86,6 @@ export async function POST(request: NextRequest) {
 
     // Validate files before creating entry to avoid orphaned entries
     if (files.length > 0) {
-      // Define validation constants
-      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-      const ALLOWED_MIME_TYPES = [
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-      ];
-      const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"];
-
       for (const file of files) {
         // Validate file is not empty
         if (file.size === 0) {
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // Generate unique filename (extension validated above via getFileExtension)
+        // Safe to use ! operator since extension was validated above
         const fileExtension = getFileExtension(file.name)!;
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = join(process.cwd(), "public", "uploads", fileName);
@@ -176,11 +176,11 @@ export async function POST(request: NextRequest) {
             },
           });
         } catch (error) {
-          // Clean up file if it was written but DB operation failed
+          // Clean up file if DB operation failed after successful file write
           try {
             await unlink(filePath);
           } catch {
-            // Ignore cleanup errors (file may not exist)
+            // Ignore cleanup errors (e.g., permission issues, file already deleted)
           }
           throw error; // Re-throw to be caught by outer try-catch
         }
