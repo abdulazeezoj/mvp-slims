@@ -105,12 +105,15 @@ export async function POST(request: NextRequest) {
           // Save file
           await writeFile(filePath, buffer);
 
+          // Determine file type based on extension
+          const fileType = fileExtension === "pdf" ? "DOCUMENT" : "IMAGE";
+
           // Create attachment record
           await prisma.attachment.create({
             data: {
               fileName: file.name,
               fileUrl: `/uploads/${fileName}`,
-              fileType: "IMAGE",
+              fileType,
               fileSize: file.size,
               logbookEntryId: entry.id,
             },
