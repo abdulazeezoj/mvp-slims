@@ -65,19 +65,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create entry
-    const entry = await prisma.logbookEntry.create({
-      data: {
-        logbookId: logbook.id,
-        weekNumber,
-        dayOfWeek,
-        date: new Date(date),
-        description,
-        skillsLearned: skillsLearned || null,
-      },
-    });
-
-    // Handle file uploads
+    // Validate files before creating entry to avoid orphaned entries
     if (files.length > 0) {
       // Define validation constants
       const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -130,11 +118,32 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
+        }
+      }
+    }
 
+    // Create entry
+    const entry = await prisma.logbookEntry.create({
+      data: {
+        logbookId: logbook.id,
+        weekNumber,
+        dayOfWeek,
+        date: new Date(date),
+        description,
+        skillsLearned: skillsLearned || null,
+      },
+    });
+
+    // Handle file uploads (validation already done above)
+    if (files.length > 0) {
+      for (const file of files) {
+        if (file.size > 0) {
           const bytes = await file.arrayBuffer();
           const buffer = Buffer.from(bytes);
 
-          // Generate unique filename
+          // Generate unique filename using validated extension
+          const lastDotIndex = file.name.lastIndexOf(".");
+          const fileExtension = file.name.slice(lastDotIndex + 1).toLowerCase();
           const fileName = `${uuidv4()}.${fileExtension}`;
           const filePath = join(process.cwd(), "public", "uploads", fileName);
 
