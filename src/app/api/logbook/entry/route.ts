@@ -79,19 +79,19 @@ export async function POST(request: NextRequest) {
 
     // Handle file uploads
     if (files.length > 0) {
+      // Ensure directory exists once before processing files
+      const uploadsDir = join(process.cwd(), "public", "uploads");
+      await mkdir(uploadsDir, { recursive: true });
+
       for (const file of files) {
         if (file.size > 0) {
           const bytes = await file.arrayBuffer();
           const buffer = Buffer.from(bytes);
 
           // Generate unique filename
-          const fileExtension = file.name.split(".").pop();
+          const fileExtension = file.name.split(".").pop() || "bin";
           const fileName = `${uuidv4()}.${fileExtension}`;
-          const uploadsDir = join(process.cwd(), "public", "uploads");
           const filePath = join(uploadsDir, fileName);
-
-          // Ensure directory exists
-          await mkdir(uploadsDir, { recursive: true });
 
           // Save file
           await writeFile(filePath, buffer);
