@@ -128,9 +128,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if at least one supervisor was notified
-    const hasIndustrySupervisor = logbook.industrySupervisor?.user.email;
-    const hasSchoolSupervisor = logbook.schoolSupervisor?.user.email;
+    const hasIndustrySupervisor = !!logbook.industrySupervisor?.user.email;
+    const hasSchoolSupervisor = !!logbook.schoolSupervisor?.user.email;
     
+    // Check if no supervisors have emails
+    if (!hasIndustrySupervisor && !hasSchoolSupervisor) {
+      return NextResponse.json(
+        { error: "No supervisor email addresses found" },
+        { status: 400 }
+      );
+    }
+    
+    // Check for notification failures
     if (hasIndustrySupervisor && !industrySupervisorNotified) {
       if (hasSchoolSupervisor && !schoolSupervisorNotified) {
         return NextResponse.json(
