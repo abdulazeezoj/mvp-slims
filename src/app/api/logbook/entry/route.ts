@@ -158,9 +158,8 @@ export async function POST(request: NextRequest) {
 
         // Generate unique filename using validated extension
         const fileExtension = getFileExtension(file.name);
-        // Extension should exist due to validation above, but handle gracefully
+        // Extension should exist due to validation above
         if (!fileExtension) {
-          console.error(`Unexpected validation error: file with no extension passed validation`);
           return NextResponse.json(
             { error: "An error occurred while processing file uploads" },
             { status: 500 }
