@@ -7,6 +7,9 @@ import { writeFile } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 
+// Whitelist of allowed file extensions
+const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "pdf"];
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -84,8 +87,18 @@ export async function POST(request: NextRequest) {
           const bytes = await file.arrayBuffer();
           const buffer = Buffer.from(bytes);
 
-          // Generate unique filename
-          const fileExtension = file.name.split(".").pop();
+          // Extract and validate file extension
+          const fileExtension = file.name.split(".").pop()?.toLowerCase();
+          if (!fileExtension || !ALLOWED_EXTENSIONS.includes(fileExtension)) {
+            return NextResponse.json(
+              { 
+                error: `Invalid file type. Allowed types: ${ALLOWED_EXTENSIONS.join(", ")}` 
+              },
+              { status: 400 }
+            );
+          }
+
+          // Generate unique filename with validated extension
           const fileName = `${uuidv4()}.${fileExtension}`;
           const filePath = join(process.cwd(), "public", "uploads", fileName);
 
