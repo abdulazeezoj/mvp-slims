@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
-import { writeFile } from "fs/promises";
+import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 
@@ -178,10 +178,9 @@ export async function POST(request: NextRequest) {
         } catch (error) {
           // Clean up file if it was written but DB operation failed
           try {
-            const { unlink } = await import("fs/promises");
             await unlink(filePath);
           } catch {
-            // Ignore cleanup errors
+            // Ignore cleanup errors (file may not exist)
           }
           throw error; // Re-throw to be caught by outer try-catch
         }
