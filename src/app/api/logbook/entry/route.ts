@@ -156,11 +156,12 @@ export async function POST(request: NextRequest) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // Generate unique filename (extension validated above, guaranteed to exist)
+        // Generate unique filename (extension validated above via getFileExtension)
         const fileExtension = getFileExtension(file.name)!;
         const fileName = `${uuidv4()}.${fileExtension}`;
         const filePath = join(process.cwd(), "public", "uploads", fileName);
 
+        let fileWritten = false;
         try {
           // Create attachment record first
           await prisma.attachment.create({
@@ -175,14 +176,16 @@ export async function POST(request: NextRequest) {
 
           // Save file to disk after successful DB operation
           await writeFile(filePath, buffer);
+          fileWritten = true;
         } catch (error) {
-          // Clean up orphaned file if it was written but something failed
-          // (e.g., if writeFile succeeded but a later operation in the loop failed)
-          try {
-            const { unlink } = await import("fs/promises");
-            await unlink(filePath);
-          } catch {
-            // Safely ignore - file may not exist if DB operation failed
+          // Clean up file only if it was successfully written
+          if (fileWritten) {
+            try {
+              const { unlink } = await import("fs/promises");
+              await unlink(filePath);
+            } catch {
+              // Ignore cleanup errors
+            }
           }
           throw error; // Re-throw to be caught by outer try-catch
         }
