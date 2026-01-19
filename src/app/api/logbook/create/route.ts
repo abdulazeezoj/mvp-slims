@@ -68,10 +68,8 @@ export async function POST(request: NextRequest) {
     if (!industrySupervisor) {
       // Create new industry supervisor account
       // Generate a cryptographically secure random password
-      const tempPassword = await hash(
-        randomBytes(12).toString("base64"),
-        10
-      );
+      const plainPassword = randomBytes(12).toString("base64");
+      const tempPassword = await hash(plainPassword, 10);
 
       const supervisorUser = await prisma.user.create({
         data: {
