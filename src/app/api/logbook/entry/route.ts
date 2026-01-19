@@ -176,12 +176,13 @@ export async function POST(request: NextRequest) {
           // Save file to disk after successful DB operation
           await writeFile(filePath, buffer);
         } catch (error) {
-          // If anything fails, try to clean up any created files
+          // Clean up orphaned file if it was written but something failed
+          // (e.g., if writeFile succeeded but a later operation in the loop failed)
           try {
             const { unlink } = await import("fs/promises");
             await unlink(filePath);
           } catch {
-            // Ignore cleanup errors
+            // Safely ignore - file may not exist if DB operation failed
           }
           throw error; // Re-throw to be caught by outer try-catch
         }
