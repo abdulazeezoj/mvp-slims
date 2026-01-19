@@ -16,27 +16,34 @@ const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "pdf"];
  * @returns The validated lowercase extension or null if invalid
  */
 function validateFileExtension(filename: string): string | null {
-  // Decode URL-encoded characters to detect encoded path traversal attempts
+  // Apply multiple rounds of URL decoding to detect nested encoding attacks
   let decodedFilename = filename;
-  try {
-    decodedFilename = decodeURIComponent(filename);
-  } catch {
-    // Invalid encoding, reject
-    return null;
+  let previousFilename = "";
+  let iterations = 0;
+  const maxIterations = 3; // Prevent infinite loops
+
+  while (decodedFilename !== previousFilename && iterations < maxIterations) {
+    previousFilename = decodedFilename;
+    try {
+      decodedFilename = decodeURIComponent(decodedFilename);
+    } catch {
+      // Invalid encoding, reject
+      return null;
+    }
+    iterations++;
   }
 
-  // Check for suspicious patterns (path traversal, null bytes)
+  // Check for suspicious patterns in decoded filename (path traversal, null bytes)
   if (
     decodedFilename.includes("..") || 
     decodedFilename.includes("/") || 
     decodedFilename.includes("\\") || 
-    decodedFilename.includes("\0") ||
-    decodedFilename !== filename // Reject if encoding was detected
+    decodedFilename.includes("\0")
   ) {
     return null;
   }
 
-  // Extract extension from the last dot only
+  // Extract extension from the last dot only, using original filename
   const lastDotIndex = filename.lastIndexOf(".");
   if (lastDotIndex === -1 || lastDotIndex === filename.length - 1) {
     return null;
@@ -116,7 +123,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate files before creating entry
+    // Validate files before creating entry and store validated extensions
+    const validatedFiles: Map<File, string> = new Map();
     if (files.length > 0) {
       for (const file of files) {
         if (file.size > 0) {
@@ -129,6 +137,7 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
+          validatedFiles.set(file, fileExtension);
         }
       }
     }
@@ -146,41 +155,31 @@ export async function POST(request: NextRequest) {
     });
 
     // Handle file uploads
-    if (files.length > 0) {
-      for (const file of files) {
-        if (file.size > 0) {
-          const bytes = await file.arrayBuffer();
-          const buffer = Buffer.from(bytes);
+    if (validatedFiles.size > 0) {
+      for (const [file, fileExtension] of validatedFiles) {
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
 
-          // Extract validated file extension
-          const fileExtension = validateFileExtension(file.name);
-          // This should never happen as we validated before, but check for safety
-          if (!fileExtension) {
-            console.error(`File validation inconsistency for file: ${file.name}`);
-            throw new Error("File validation failed unexpectedly");
-          }
+        // Generate unique filename with validated extension
+        const fileName = `${uuidv4()}.${fileExtension}`;
+        const filePath = join(process.cwd(), "public", "uploads", fileName);
 
-          // Generate unique filename with validated extension
-          const fileName = `${uuidv4()}.${fileExtension}`;
-          const filePath = join(process.cwd(), "public", "uploads", fileName);
+        // Save file
+        await writeFile(filePath, buffer);
 
-          // Save file
-          await writeFile(filePath, buffer);
+        // Determine file type based on extension
+        const fileType = getFileType(fileExtension);
 
-          // Determine file type based on extension
-          const fileType = getFileType(fileExtension);
-
-          // Create attachment record
-          await prisma.attachment.create({
-            data: {
-              fileName: file.name,
-              fileUrl: `/uploads/${fileName}`,
-              fileType,
-              fileSize: file.size,
-              logbookEntryId: entry.id,
-            },
-          });
-        }
+        // Create attachment record
+        await prisma.attachment.create({
+          data: {
+            fileName: file.name,
+            fileUrl: `/uploads/${fileName}`,
+            fileType,
+            fileSize: file.size,
+            logbookEntryId: entry.id,
+          },
+        });
       }
     }
 
