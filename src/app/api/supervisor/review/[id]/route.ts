@@ -41,7 +41,7 @@ export async function POST(
     // Verify the supervisor is assigned to this logbook
     const supervisorId = session.user.profile?.id;
     if (!supervisorId) {
-      return NextResponse.json({ error: "Supervisor profile not found" }, { status: 401 });
+      return NextResponse.json({ error: "Supervisor profile not found" }, { status: 500 });
     }
 
     const isAuthorizedIndustrySupervisor =
