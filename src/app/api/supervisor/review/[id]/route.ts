@@ -20,7 +20,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { comment, isIndustrySupervisor } = body;
+    const { comment } = body;
 
     const report = await prisma.weeklyReport.findUnique({
       where: { id: params.id },
@@ -46,13 +46,11 @@ export async function POST(
 
     const isAuthorizedIndustrySupervisor =
       session.user.role === UserRole.INDUSTRY_SUPERVISOR &&
-      report.logbook.industrySupervisorId === supervisorId &&
-      isIndustrySupervisor;
+      report.logbook.industrySupervisorId === supervisorId;
 
     const isAuthorizedSchoolSupervisor =
       session.user.role === UserRole.SCHOOL_SUPERVISOR &&
-      report.logbook.schoolSupervisorId === supervisorId &&
-      !isIndustrySupervisor;
+      report.logbook.schoolSupervisorId === supervisorId;
 
     if (!isAuthorizedIndustrySupervisor && !isAuthorizedSchoolSupervisor) {
       return NextResponse.json(
@@ -61,8 +59,8 @@ export async function POST(
       );
     }
 
-    // Update the appropriate supervisor comment
-    const updateData = isIndustrySupervisor
+    // Update the appropriate supervisor comment based on the user's role
+    const updateData = isAuthorizedIndustrySupervisor
       ? {
           industrySupervisorComment: comment,
           industrySupervisorCommentedAt: new Date(),
