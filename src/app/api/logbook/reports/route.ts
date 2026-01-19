@@ -65,9 +65,9 @@ export async function POST(request: NextRequest) {
     const { weekNumber, summary } = body;
 
     // Validate input fields
-    if (!weekNumber || typeof weekNumber !== "number") {
+    if (typeof weekNumber !== "number" || !Number.isInteger(weekNumber)) {
       return NextResponse.json(
-        { error: "Week number is required and must be a number" },
+        { error: "Week number is required and must be an integer" },
         { status: 400 }
       );
     }
