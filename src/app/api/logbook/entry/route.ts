@@ -10,6 +10,29 @@ import { v4 as uuidv4 } from "uuid";
 // Whitelist of allowed file extensions
 const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "pdf"];
 
+/**
+ * Validates and extracts file extension from filename
+ * @param filename - The filename to validate
+ * @returns The validated lowercase extension or null if invalid
+ */
+function validateFileExtension(filename: string): string | null {
+  // Check for suspicious patterns (path traversal, null bytes)
+  if (filename.includes("..") || filename.includes("/") || filename.includes("\\") || filename.includes("\0")) {
+    return null;
+  }
+
+  // Extract extension from the last dot only
+  const lastDotIndex = filename.lastIndexOf(".");
+  if (lastDotIndex === -1 || lastDotIndex === filename.length - 1) {
+    return null;
+  }
+
+  const extension = filename.substring(lastDotIndex + 1).toLowerCase();
+  
+  // Validate against whitelist
+  return ALLOWED_EXTENSIONS.includes(extension) ? extension : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -68,6 +91,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate files before creating entry
+    if (files.length > 0) {
+      for (const file of files) {
+        if (file.size > 0) {
+          const fileExtension = validateFileExtension(file.name);
+          if (!fileExtension) {
+            return NextResponse.json(
+              { 
+                error: `Invalid file type. Allowed types: ${ALLOWED_EXTENSIONS.join(", ")}` 
+              },
+              { status: 400 }
+            );
+          }
+        }
+      }
+    }
+
     // Create entry
     const entry = await prisma.logbookEntry.create({
       data: {
@@ -87,15 +127,11 @@ export async function POST(request: NextRequest) {
           const bytes = await file.arrayBuffer();
           const buffer = Buffer.from(bytes);
 
-          // Extract and validate file extension
-          const fileExtension = file.name.split(".").pop()?.toLowerCase();
-          if (!fileExtension || !ALLOWED_EXTENSIONS.includes(fileExtension)) {
-            return NextResponse.json(
-              { 
-                error: `Invalid file type. Allowed types: ${ALLOWED_EXTENSIONS.join(", ")}` 
-              },
-              { status: 400 }
-            );
+          // Extract validated file extension
+          const fileExtension = validateFileExtension(file.name);
+          // This should not happen as we validated before, but adding for safety
+          if (!fileExtension) {
+            continue;
           }
 
           // Generate unique filename with validated extension
