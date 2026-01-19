@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
-import { writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 
@@ -87,7 +87,11 @@ export async function POST(request: NextRequest) {
           // Generate unique filename
           const fileExtension = file.name.split(".").pop();
           const fileName = `${uuidv4()}.${fileExtension}`;
-          const filePath = join(process.cwd(), "public", "uploads", fileName);
+          const uploadsDir = join(process.cwd(), "public", "uploads");
+          const filePath = join(uploadsDir, fileName);
+
+          // Ensure directory exists
+          await mkdir(uploadsDir, { recursive: true });
 
           // Save file
           await writeFile(filePath, buffer);
