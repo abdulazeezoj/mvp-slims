@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { BookOpen, FileText, Settings, LogOut, Home } from "lucide-react";
+import { BookOpen, FileText, LogOut, Home } from "lucide-react";
 import { Session } from "next-auth";
 
 interface DashboardNavProps {
