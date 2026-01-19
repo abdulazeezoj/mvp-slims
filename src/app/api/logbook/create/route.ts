@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
 import { hash } from "bcryptjs";
+import { randomBytes } from "crypto";
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,10 +67,9 @@ export async function POST(request: NextRequest) {
 
     if (!industrySupervisor) {
       // Create new industry supervisor account
-      const tempPassword = await hash(
-        Math.random().toString(36).slice(-8),
-        10
-      );
+      // Generate a cryptographically secure random password
+      const plainPassword = randomBytes(12).toString("base64");
+      const tempPassword = await hash(plainPassword, 10);
 
       const supervisorUser = await prisma.user.create({
         data: {
