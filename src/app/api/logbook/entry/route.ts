@@ -7,6 +7,15 @@ import { writeFile } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 
+// Helper function to extract and validate file extension
+function getFileExtension(fileName: string): string | null {
+  const lastDotIndex = fileName.lastIndexOf(".");
+  if (lastDotIndex === -1) {
+    return null;
+  }
+  return fileName.slice(lastDotIndex + 1).toLowerCase();
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -78,46 +87,53 @@ export async function POST(request: NextRequest) {
       const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"];
 
       for (const file of files) {
-        if (file.size > 0) {
-          // Validate file size
-          if (file.size > MAX_FILE_SIZE) {
-            return NextResponse.json(
-              {
-                error: `File "${file.name}" exceeds maximum size of 5MB`,
-              },
-              { status: 400 }
-            );
-          }
+        // Validate file is not empty
+        if (file.size === 0) {
+          return NextResponse.json(
+            {
+              error: `File "${file.name}" is empty. Please upload a valid file`,
+            },
+            { status: 400 }
+          );
+        }
 
-          // Validate MIME type
-          if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-            return NextResponse.json(
-              {
-                error: `File "${file.name}" has invalid type. Only image files (JPEG, PNG, GIF, WebP) are allowed`,
-              },
-              { status: 400 }
-            );
-          }
+        // Validate file size
+        if (file.size > MAX_FILE_SIZE) {
+          return NextResponse.json(
+            {
+              error: `File "${file.name}" exceeds maximum size of 5MB`,
+            },
+            { status: 400 }
+          );
+        }
 
-          // Validate file extension - get the last extension after the final dot
-          const lastDotIndex = file.name.lastIndexOf(".");
-          if (lastDotIndex === -1) {
-            return NextResponse.json(
-              {
-                error: `File "${file.name}" has no extension. Only .jpg, .jpeg, .png, .gif, .webp are allowed`,
-              },
-              { status: 400 }
-            );
-          }
-          const fileExtension = file.name.slice(lastDotIndex + 1).toLowerCase();
-          if (!ALLOWED_EXTENSIONS.includes(fileExtension)) {
-            return NextResponse.json(
-              {
-                error: `File "${file.name}" has invalid extension. Only .jpg, .jpeg, .png, .gif, .webp are allowed`,
-              },
-              { status: 400 }
-            );
-          }
+        // Validate MIME type
+        if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+          return NextResponse.json(
+            {
+              error: `File "${file.name}" has invalid type. Only image files (JPEG, PNG, GIF, WebP) are allowed`,
+            },
+            { status: 400 }
+          );
+        }
+
+        // Validate file extension using helper function
+        const fileExtension = getFileExtension(file.name);
+        if (!fileExtension) {
+          return NextResponse.json(
+            {
+              error: `File "${file.name}" has no extension. Only .jpg, .jpeg, .png, .gif, .webp are allowed`,
+            },
+            { status: 400 }
+          );
+        }
+        if (!ALLOWED_EXTENSIONS.includes(fileExtension)) {
+          return NextResponse.json(
+            {
+              error: `File "${file.name}" has invalid extension. Only .jpg, .jpeg, .png, .gif, .webp are allowed`,
+            },
+            { status: 400 }
+          );
         }
       }
     }
@@ -137,30 +153,27 @@ export async function POST(request: NextRequest) {
     // Handle file uploads (validation already done above)
     if (files.length > 0) {
       for (const file of files) {
-        if (file.size > 0) {
-          const bytes = await file.arrayBuffer();
-          const buffer = Buffer.from(bytes);
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
 
-          // Generate unique filename using validated extension
-          const lastDotIndex = file.name.lastIndexOf(".");
-          const fileExtension = file.name.slice(lastDotIndex + 1).toLowerCase();
-          const fileName = `${uuidv4()}.${fileExtension}`;
-          const filePath = join(process.cwd(), "public", "uploads", fileName);
+        // Generate unique filename using validated extension
+        const fileExtension = getFileExtension(file.name)!;
+        const fileName = `${uuidv4()}.${fileExtension}`;
+        const filePath = join(process.cwd(), "public", "uploads", fileName);
 
-          // Save file
-          await writeFile(filePath, buffer);
+        // Save file
+        await writeFile(filePath, buffer);
 
-          // Create attachment record
-          await prisma.attachment.create({
-            data: {
-              fileName: file.name,
-              fileUrl: `/uploads/${fileName}`,
-              fileType: "IMAGE",
-              fileSize: file.size,
-              logbookEntryId: entry.id,
-            },
-          });
-        }
+        // Create attachment record
+        await prisma.attachment.create({
+          data: {
+            fileName: file.name,
+            fileUrl: `/uploads/${fileName}`,
+            fileType: "IMAGE",
+            fileSize: file.size,
+            logbookEntryId: entry.id,
+          },
+        });
       }
     }
 
