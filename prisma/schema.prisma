@@ -1,0 +1,252 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  INDUSTRY_SUPERVISOR
+  SCHOOL_SUPERVISOR
+  ADMIN
+}
+
+enum State {
+  ABIA
+  ADAMAWA
+  AKWA_IBOM
+  ANAMBRA
+  BAUCHI
+  BAYELSA
+  BENUE
+  BORNO
+  CROSS_RIVER
+  DELTA
+  EBONYI
+  EDO
+  EKITI
+  ENUGU
+  FCT
+  GOMBE
+  IMO
+  JIGAWA
+  KADUNA
+  KANO
+  KATSINA
+  KEBBI
+  KOGI
+  KWARA
+  LAGOS
+  NASARAWA
+  NIGER
+  OGUN
+  ONDO
+  OSUN
+  OYO
+  PLATEAU
+  RIVERS
+  SOKOTO
+  TARABA
+  YOBE
+  ZAMFARA
+}
+
+model User {
+  id                String     @id @default(cuid())
+  email             String?    @unique
+  matricNumber      String?    @unique
+  password          String
+  role              UserRole
+  state             State?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  // Relations
+  student           Student?
+  industrySupervisor IndustrySupervisor?
+  schoolSupervisor   SchoolSupervisor?
+  admin             Admin?
+}
+
+model Student {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  firstName             String
+  lastName              String
+  middleName            String?
+  faculty               String
+  department            String
+  course                String
+  level                 String
+  semester              String
+  session               String
+  phoneNumber           String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logbooks              Logbook[]
+}
+
+model IndustrySupervisor {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  firstName   String
+  lastName    String
+  company     String
+  position    String
+  phoneNumber String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logbooks    Logbook[]
+}
+
+model SchoolSupervisor {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  firstName   String
+  lastName    String
+  department  String
+  faculty     String
+  phoneNumber String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logbooks    Logbook[]
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  firstName String
+  lastName  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  systemConfigs SystemConfig[]
+}
+
+model Logbook {
+  id                    String   @id @default(cuid())
+  studentId             String
+  industrySupervisorId  String?
+  schoolSupervisorId    String?
+
+  // Company/Organization details
+  companyName           String
+  companyAddress        String
+  companyState          State
+
+  // Training period
+  startDate             DateTime
+  endDate               DateTime
+  totalWeeks            Int      @default(24)
+
+  // Status
+  isActive              Boolean  @default(true)
+  isSubmitted           Boolean  @default(false)
+  submittedAt           DateTime?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  student               Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  industrySupervisor    IndustrySupervisor? @relation(fields: [industrySupervisorId], references: [id])
+  schoolSupervisor      SchoolSupervisor? @relation(fields: [schoolSupervisorId], references: [id])
+  entries               LogbookEntry[]
+  weeklyReports         WeeklyReport[]
+}
+
+model LogbookEntry {
+  id              String   @id @default(cuid())
+  logbookId       String
+  weekNumber      Int
+  dayOfWeek       String   // MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY
+  date            DateTime
+  description     String   @db.Text
+  skillsLearned   String?  @db.Text
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  logbook         Logbook  @relation(fields: [logbookId], references: [id], onDelete: Cascade)
+  attachments     Attachment[]
+
+  @@unique([logbookId, weekNumber, dayOfWeek])
+}
+
+model WeeklyReport {
+  id                          String   @id @default(cuid())
+  logbookId                   String
+  weekNumber                  Int
+
+  // Student's summary
+  studentSummary              String?  @db.Text
+  studentSubmittedAt          DateTime?
+
+  // Industry Supervisor's comment
+  industrySupervisorComment   String?  @db.Text
+  industrySupervisorCommentedAt DateTime?
+  industrySupervisorNotifiedAt  DateTime?
+
+  // School Supervisor's comment
+  schoolSupervisorComment     String?  @db.Text
+  schoolSupervisorCommentedAt DateTime?
+  schoolSupervisorNotifiedAt  DateTime?
+
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  // Relations
+  logbook                     Logbook  @relation(fields: [logbookId], references: [id], onDelete: Cascade)
+  attachments                 Attachment[]
+
+  @@unique([logbookId, weekNumber])
+}
+
+model Attachment {
+  id              String   @id @default(cuid())
+  fileName        String
+  fileUrl         String
+  fileType        String   // IMAGE, DIAGRAM, DOCUMENT
+  fileSize        Int
+
+  // Optional relations
+  logbookEntryId  String?
+  weeklyReportId  String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  logbookEntry    LogbookEntry? @relation(fields: [logbookEntryId], references: [id], onDelete: Cascade)
+  weeklyReport    WeeklyReport? @relation(fields: [weeklyReportId], references: [id], onDelete: Cascade)
+}
+
+model SystemConfig {
+  id          String   @id @default(cuid())
+  adminId     String
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  admin       Admin    @relation(fields: [adminId], references: [id])
+}
