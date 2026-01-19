@@ -16,8 +16,23 @@ const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "pdf"];
  * @returns The validated lowercase extension or null if invalid
  */
 function validateFileExtension(filename: string): string | null {
+  // Decode URL-encoded characters to detect encoded path traversal attempts
+  let decodedFilename = filename;
+  try {
+    decodedFilename = decodeURIComponent(filename);
+  } catch {
+    // Invalid encoding, reject
+    return null;
+  }
+
   // Check for suspicious patterns (path traversal, null bytes)
-  if (filename.includes("..") || filename.includes("/") || filename.includes("\\") || filename.includes("\0")) {
+  if (
+    decodedFilename.includes("..") || 
+    decodedFilename.includes("/") || 
+    decodedFilename.includes("\\") || 
+    decodedFilename.includes("\0") ||
+    decodedFilename !== filename // Reject if encoding was detected
+  ) {
     return null;
   }
 
@@ -31,6 +46,16 @@ function validateFileExtension(filename: string): string | null {
   
   // Validate against whitelist
   return ALLOWED_EXTENSIONS.includes(extension) ? extension : null;
+}
+
+/**
+ * Determines the file type category based on extension
+ * @param extension - The file extension
+ * @returns The file type category (IMAGE, DOCUMENT, or DIAGRAM)
+ */
+function getFileType(extension: string): string {
+  const documentExtensions = ["pdf"];
+  return documentExtensions.includes(extension) ? "DOCUMENT" : "IMAGE";
 }
 
 export async function POST(request: NextRequest) {
@@ -129,9 +154,10 @@ export async function POST(request: NextRequest) {
 
           // Extract validated file extension
           const fileExtension = validateFileExtension(file.name);
-          // This should not happen as we validated before, but adding for safety
+          // This should never happen as we validated before, but check for safety
           if (!fileExtension) {
-            continue;
+            console.error(`File validation inconsistency for file: ${file.name}`);
+            throw new Error("File validation failed unexpectedly");
           }
 
           // Generate unique filename with validated extension
@@ -142,7 +168,7 @@ export async function POST(request: NextRequest) {
           await writeFile(filePath, buffer);
 
           // Determine file type based on extension
-          const fileType = fileExtension === "pdf" ? "DOCUMENT" : "IMAGE";
+          const fileType = getFileType(fileExtension);
 
           // Create attachment record
           await prisma.attachment.create({
