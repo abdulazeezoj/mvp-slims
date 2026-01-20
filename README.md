@@ -40,7 +40,7 @@ training while providing real-time oversight for both school and industry superv
 - **UI Framework**: Shadcn UI, Tailwind CSS v4 (CSS-first configuration)
 - **Backend**: Next.js API Routes, Server Actions
 - **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: NextAuth.js v5 (Beta)
+- **Authentication**: Better Auth (framework-agnostic auth for modern web apps)
 - **Email Service**: Nodemailer
 - **PDF Generation**: jsPDF with autoTable
 - **Diagram Editor**: Draw.io embedded integration
@@ -82,9 +82,9 @@ Update the following variables in `.env`:
 # Database
 DATABASE_URL="postgresql://user:password@localhost:5432/slims_db?schema=public"
 
-# NextAuth
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="your-secret-key-here"
+# Better Auth
+BETTER_AUTH_SECRET="your-secret-key-here"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
 # Email Configuration
 EMAIL_SERVER_HOST="smtp.gmail.com"
@@ -136,18 +136,42 @@ Visit [http://localhost:3000](http://localhost:3000) to view the application.
 - `SCHOOL_SUPERVISOR`: ABU lecturers
 - `ADMIN`: System administrators
 
-## 🔐 Authentication Flow
+## 🔐 Authentication with Better Auth
 
-### Students
+SLIMS uses [Better Auth](https://www.better-auth.com/) - a modern, framework-agnostic authentication library that provides:
+- 🔒 Secure session management with JWT
+- 🎯 Custom authentication flows (matric number + state validation)
+- 🔌 Prisma adapter for seamless database integration
+- 🍪 Automatic cookie handling with Next.js
+- 📱 Type-safe client and server APIs
+
+### Why Better Auth?
+
+- **Framework-agnostic**: Works across React, Next.js, and other frameworks
+- **Modern Architecture**: Built for App Router and server components
+- **Custom Authentication**: Supports unique flows like matric number + state validation
+- **Better TypeScript**: Full type inference without manual declaration merging
+- **Maintained**: Actively developed with regular updates
+
+### Authentication Flow
+
+#### Students
 1. Sign up with Matric Number, State, and Password
 2. Complete profile with academic information
 3. Create logbook with company details
 4. Add industry supervisor information
 
-### Supervisors
+#### Supervisors
 1. Auto-created when student adds them to logbook
 2. Receive email with login credentials
 3. Access review interface via email links
+
+### Custom Authentication
+
+SLIMS implements custom authentication logic for student login:
+- Validates matric number against database
+- Verifies state of origin for added security
+- Creates session using Better Auth's session management
 
 ## 📧 Email Notifications
 
