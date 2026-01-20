@@ -7,6 +7,64 @@ import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 
+// Whitelist of allowed file extensions
+const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "pdf"];
+
+/**
+ * Validates and extracts file extension from filename
+ * @param filename - The filename to validate
+ * @returns The validated lowercase extension or null if invalid
+ */
+function validateFileExtension(filename: string): string | null {
+  // Apply multiple rounds of URL decoding to detect nested encoding attacks
+  let decodedFilename = filename;
+  let previousFilename = "";
+  let iterations = 0;
+  const maxIterations = 3; // Prevent infinite loops
+
+  while (decodedFilename !== previousFilename && iterations < maxIterations) {
+    previousFilename = decodedFilename;
+    try {
+      decodedFilename = decodeURIComponent(decodedFilename);
+    } catch {
+      // Invalid encoding, reject
+      return null;
+    }
+    iterations++;
+  }
+
+  // Check for suspicious patterns in decoded filename (path traversal, null bytes)
+  if (
+    decodedFilename.includes("..") || 
+    decodedFilename.includes("/") || 
+    decodedFilename.includes("\\") || 
+    decodedFilename.includes("\0")
+  ) {
+    return null;
+  }
+
+  // Extract extension from the last dot only, using original filename
+  const lastDotIndex = filename.lastIndexOf(".");
+  if (lastDotIndex === -1 || lastDotIndex === filename.length - 1) {
+    return null;
+  }
+
+  const extension = filename.substring(lastDotIndex + 1).toLowerCase();
+  
+  // Validate against whitelist
+  return ALLOWED_EXTENSIONS.includes(extension) ? extension : null;
+}
+
+/**
+ * Determines the file type category based on extension
+ * @param extension - The file extension
+ * @returns The file type category (IMAGE, DOCUMENT, or DIAGRAM)
+ */
+function getFileType(extension: string): string {
+  const documentExtensions = ["pdf"];
+  return documentExtensions.includes(extension) ? "DOCUMENT" : "IMAGE";
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -65,6 +123,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate files before creating entry and store validated extensions
+    const validatedFiles: Map<File, string> = new Map();
+    if (files.length > 0) {
+      for (const file of files) {
+        if (file.size > 0) {
+          const fileExtension = validateFileExtension(file.name);
+          if (!fileExtension) {
+            return NextResponse.json(
+              { 
+                error: `Invalid file type. Allowed types: ${ALLOWED_EXTENSIONS.join(", ")}` 
+              },
+              { status: 400 }
+            );
+          }
+          validatedFiles.set(file, fileExtension);
+        }
+      }
+    }
+
     // Create entry
     const entry = await prisma.logbookEntry.create({
       data: {
@@ -78,35 +155,31 @@ export async function POST(request: NextRequest) {
     });
 
     // Handle file uploads
-    if (files.length > 0) {
-      // Ensure directory exists once before processing files
-      const uploadsDir = join(process.cwd(), "public", "uploads");
-      await mkdir(uploadsDir, { recursive: true });
+    if (validatedFiles.size > 0) {
+      for (const [file, fileExtension] of validatedFiles) {
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
 
-      for (const file of files) {
-        if (file.size > 0) {
-          const bytes = await file.arrayBuffer();
-          const buffer = Buffer.from(bytes);
+        // Generate unique filename with validated extension
+        const fileName = `${uuidv4()}.${fileExtension}`;
+        const filePath = join(process.cwd(), "public", "uploads", fileName);
 
-          // Generate unique filename
-          const fileExtension = file.name.split(".").pop() || "bin";
-          const fileName = `${uuidv4()}.${fileExtension}`;
-          const filePath = join(uploadsDir, fileName);
+        // Save file
+        await writeFile(filePath, buffer);
 
-          // Save file
-          await writeFile(filePath, buffer);
+        // Determine file type based on extension
+        const fileType = getFileType(fileExtension);
 
-          // Create attachment record
-          await prisma.attachment.create({
-            data: {
-              fileName: file.name,
-              fileUrl: `/uploads/${fileName}`,
-              fileType: "IMAGE",
-              fileSize: file.size,
-              logbookEntryId: entry.id,
-            },
-          });
-        }
+        // Create attachment record
+        await prisma.attachment.create({
+          data: {
+            fileName: file.name,
+            fileUrl: `/uploads/${fileName}`,
+            fileType,
+            fileSize: file.size,
+            logbookEntryId: entry.id,
+          },
+        });
       }
     }
 
