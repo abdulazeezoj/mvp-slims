@@ -10,6 +10,20 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+/**
+ * Escapes HTML special characters to prevent XSS attacks
+ * @param unsafe - The string to escape
+ * @returns The escaped string safe for HTML insertion
+ */
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 interface SendEmailParams {
   to: string;
   subject: string;
@@ -39,6 +53,11 @@ export function getWeeklyReportNotificationEmail(
   weekNumber: number,
   reviewUrl: string
 ) {
+  // Sanitize all user-generated content to prevent XSS attacks
+  const safeSupervisorName = escapeHtml(supervisorName);
+  const safeStudentName = escapeHtml(studentName);
+  const safeReviewUrl = escapeHtml(reviewUrl);
+
   return `
     <!DOCTYPE html>
     <html>
@@ -59,11 +78,11 @@ export function getWeeklyReportNotificationEmail(
           <p>SIWES Logbook Review Request</p>
         </div>
         <div class="content">
-          <p>Dear ${supervisorName},</p>
-          <p>You have a new weekly report to review from <strong>${studentName}</strong> for <strong>Week ${weekNumber}</strong>.</p>
+          <p>Dear ${safeSupervisorName},</p>
+          <p>You have a new weekly report to review from <strong>${safeStudentName}</strong> for <strong>Week ${weekNumber}</strong>.</p>
           <p>Please click the button below to review and provide your comments:</p>
           <center>
-            <a href="${reviewUrl}" class="button">Review Weekly Report</a>
+            <a href="${safeReviewUrl}" class="button">Review Weekly Report</a>
           </center>
           <p>This is an automated notification from the SIWES Logbook & Internship Management System.</p>
         </div>

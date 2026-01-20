@@ -20,18 +20,47 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { comment, isIndustrySupervisor } = body;
+    const { comment } = body;
 
     const report = await prisma.weeklyReport.findUnique({
       where: { id: params.id },
+      include: {
+        logbook: {
+          select: {
+            industrySupervisorId: true,
+            schoolSupervisorId: true,
+          },
+        },
+      },
     });
 
     if (!report) {
       return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
 
-    // Update the appropriate supervisor comment
-    const updateData = isIndustrySupervisor
+    // Verify the supervisor is assigned to this logbook
+    const supervisorId = session.user.profile?.id;
+    if (!supervisorId) {
+      return NextResponse.json({ error: "Supervisor profile not found" }, { status: 500 });
+    }
+
+    const isAuthorizedIndustrySupervisor =
+      session.user.role === UserRole.INDUSTRY_SUPERVISOR &&
+      report.logbook.industrySupervisorId === supervisorId;
+
+    const isAuthorizedSchoolSupervisor =
+      session.user.role === UserRole.SCHOOL_SUPERVISOR &&
+      report.logbook.schoolSupervisorId === supervisorId;
+
+    if (!isAuthorizedIndustrySupervisor && !isAuthorizedSchoolSupervisor) {
+      return NextResponse.json(
+        { error: "You are not authorized to review this report" },
+        { status: 403 }
+      );
+    }
+
+    // Update the appropriate supervisor comment based on the user's role
+    const updateData = isAuthorizedIndustrySupervisor
       ? {
           industrySupervisorComment: comment,
           industrySupervisorCommentedAt: new Date(),

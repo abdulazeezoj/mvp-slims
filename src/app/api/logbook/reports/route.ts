@@ -64,6 +64,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { weekNumber, summary } = body;
 
+    // Validate input fields
+    if (typeof weekNumber !== "number" || !Number.isInteger(weekNumber)) {
+      return NextResponse.json(
+        { error: "Week number is required and must be an integer" },
+        { status: 400 }
+      );
+    }
+
+    if (typeof summary !== "string" || summary.trim() === "") {
+      return NextResponse.json(
+        { error: "Summary is required and cannot be empty" },
+        { status: 400 }
+      );
+    }
+
     const student = await prisma.student.findUnique({
       where: { userId: session.user.id },
     });
@@ -83,6 +98,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "No active logbook found" },
         { status: 404 }
+      );
+    }
+
+    // Validate week number is within valid range
+    if (weekNumber < 1 || weekNumber > logbook.totalWeeks) {
+      return NextResponse.json(
+        {
+          error: `Week number must be between 1 and ${logbook.totalWeeks}`,
+        },
+        { status: 400 }
       );
     }
 
