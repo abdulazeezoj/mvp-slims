@@ -1,20 +1,21 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { UserRole } from "@prisma/client";
 import { SupervisorReviewForm } from "@/components/supervisor/review-form";
+import { getSession } from "@/lib/auth";
+import prisma from "@/lib/prisma";
+import { UserRole } from "@prisma/client";
+import { redirect } from "next/navigation";
 
 export default async function SupervisorReviewPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession();
 
-  if (!session?.user ||
-      (session.user.role !== UserRole.INDUSTRY_SUPERVISOR &&
-       session.user.role !== UserRole.SCHOOL_SUPERVISOR)) {
+  if (
+    !session?.user ||
+    (session.user.role !== UserRole.INDUSTRY_SUPERVISOR &&
+      session.user.role !== UserRole.SCHOOL_SUPERVISOR)
+  ) {
     redirect("/supervisor/signin");
   }
 
@@ -67,7 +68,8 @@ export default async function SupervisorReviewPage({
     },
   });
 
-  const isIndustrySupervisor = session.user.role === UserRole.INDUSTRY_SUPERVISOR;
+  const isIndustrySupervisor =
+    session.user.role === UserRole.INDUSTRY_SUPERVISOR;
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -1,5 +1,5 @@
+import { auth, authenticateWithMatricAndState } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authenticateWithMatricAndState, auth } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     if (!matricNumber || !password || !state) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -20,24 +20,45 @@ export async function POST(request: NextRequest) {
       state,
     });
 
-    // Create session using better-auth
-    const session = await auth.api.signInEmail({
+    if (!user) {
+      return NextResponse.json(
+        { error: "Invalid credentials" },
+        { status: 401 },
+      );
+    }
+
+    // Create session using better-auth by signing in with email
+    const email = user.email || `${user.matricNumber}@slims.internal`;
+
+    // Use better-auth's signIn method properly
+    const response = await auth.api.signInEmail({
       body: {
-        email: user.email || `${user.matricNumber}@placeholder.com`,
+        email,
         password,
       },
-      headers: request.headers,
     });
+
+    if (!response) {
+      return NextResponse.json(
+        { error: "Failed to create session" },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({
       success: true,
       message: "Sign in successful",
+      user: {
+        id: user.id,
+        matricNumber: user.matricNumber,
+        role: user.role,
+      },
     });
   } catch (error: any) {
     console.error("Sign in error:", error);
     return NextResponse.json(
       { error: error.message || "Sign in failed" },
-      { status: 401 }
+      { status: 401 },
     );
   }
 }

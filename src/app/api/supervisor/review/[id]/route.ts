@@ -1,88 +1,62 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import {
+  forbiddenError,
+  internalServerError,
+  notFoundError,
+  successResponse,
+  unauthorizedError,
+} from "@/lib/utils";
+import { submitSupervisorReview } from "@/services/review";
 import { UserRole } from "@prisma/client";
+import { NextRequest } from "next/server";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
 
     if (
       !session?.user ||
       (session.user.role !== UserRole.INDUSTRY_SUPERVISOR &&
         session.user.role !== UserRole.SCHOOL_SUPERVISOR)
     ) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
     const body = await request.json();
     const { comment } = body;
 
-    const report = await prisma.weeklyReport.findUnique({
-      where: { id: params.id },
-      include: {
-        logbook: {
-          select: {
-            industrySupervisorId: true,
-            schoolSupervisorId: true,
-          },
-        },
-      },
+    const result = await submitSupervisorReview({
+      supervisorUserId: session.user.id,
+      supervisorRole: session.user.role,
+      reportId: params.id,
+      comment,
     });
 
-    if (!report) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    if (!result.success) {
+      if (result.code === "UNAUTHORIZED") {
+        return unauthorizedError();
+      }
+      if (result.code === "REPORT_NOT_FOUND") {
+        return notFoundError("Report");
+      }
+      if (result.code === "SUPERVISOR_NOT_FOUND") {
+        return internalServerError("Supervisor profile not found");
+      }
+      if (result.code === "FORBIDDEN") {
+        return forbiddenError(result.error!);
+      }
+      return internalServerError(result.error);
     }
 
-    // Verify the supervisor is assigned to this logbook
-    const supervisorId = session.user.profile?.id;
-    if (!supervisorId) {
-      return NextResponse.json({ error: "Supervisor profile not found" }, { status: 500 });
-    }
-
-    const isAuthorizedIndustrySupervisor =
-      session.user.role === UserRole.INDUSTRY_SUPERVISOR &&
-      report.logbook.industrySupervisorId === supervisorId;
-
-    const isAuthorizedSchoolSupervisor =
-      session.user.role === UserRole.SCHOOL_SUPERVISOR &&
-      report.logbook.schoolSupervisorId === supervisorId;
-
-    if (!isAuthorizedIndustrySupervisor && !isAuthorizedSchoolSupervisor) {
-      return NextResponse.json(
-        { error: "You are not authorized to review this report" },
-        { status: 403 }
-      );
-    }
-
-    // Update the appropriate supervisor comment based on the user's role
-    const updateData = isAuthorizedIndustrySupervisor
-      ? {
-          industrySupervisorComment: comment,
-          industrySupervisorCommentedAt: new Date(),
-        }
-      : {
-          schoolSupervisorComment: comment,
-          schoolSupervisorCommentedAt: new Date(),
-        };
-
-    await prisma.weeklyReport.update({
-      where: { id: params.id },
-      data: updateData,
-    });
-
-    return NextResponse.json({
-      message: "Comment submitted successfully",
-    });
-  } catch (error: any) {
+    return successResponse({ message: result.message });
+  } catch (error: unknown) {
     console.error("Review submission error:", error);
-    return NextResponse.json(
-      { error: error.message || "An error occurred while submitting review" },
-      { status: 500 }
+    return internalServerError(
+      "An error occurred while submitting review",
+      error,
     );
   }
 }

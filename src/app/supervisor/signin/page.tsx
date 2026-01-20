@@ -1,12 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -15,6 +9,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { authClient } from "@/lib/auth-client";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function SupervisorSignInPage() {
   const router = useRouter();
@@ -31,14 +31,13 @@ export default function SupervisorSignInPage() {
     setError("");
 
     try {
-      const result = await signIn("credentials", {
-        identifier: formData.email,
+      const { data, error } = await authClient.signIn.email({
+        email: formData.email,
         password: formData.password,
-        redirect: false,
       });
 
-      if (result?.error) {
-        setError(result.error);
+      if (error) {
+        setError(error.message || "Invalid credentials");
       } else {
         router.push("/supervisor/dashboard");
         router.refresh();
@@ -51,10 +50,12 @@ export default function SupervisorSignInPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-blue-50 to-indigo-100">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Supervisor Sign In</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            Supervisor Sign In
+          </CardTitle>
           <CardDescription>
             Enter your email to access the supervision portal
           </CardDescription>

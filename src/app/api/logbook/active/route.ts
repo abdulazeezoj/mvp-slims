@@ -1,57 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import {
+  internalServerError,
+  notFoundError,
+  successResponse,
+  unauthorizedError,
+} from "@/lib/utils";
+import { getActiveLogbook } from "@/services/logbook";
 import { UserRole } from "@prisma/client";
+import { NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
 
     if (!session?.user || session.user.role !== UserRole.STUDENT) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
-    const student = await prisma.student.findUnique({
-      where: { userId: session.user.id },
+    const result = await getActiveLogbook(session.user.id);
+
+    if (!result.success) {
+      if (result.code === "STUDENT_NOT_FOUND") {
+        return notFoundError("Student");
+      }
+      if (result.code === "NO_ACTIVE_LOGBOOK") {
+        return notFoundError("Active logbook");
+      }
+      return internalServerError(result.error);
+    }
+
+    return successResponse<{ logbook: typeof result.logbook }>({
+      data: { logbook: result.logbook },
     });
-
-    if (!student) {
-      return NextResponse.json({ error: "Student not found" }, { status: 404 });
-    }
-
-    const logbook = await prisma.logbook.findFirst({
-      where: {
-        studentId: student.id,
-        isActive: true,
-      },
-      include: {
-        industrySupervisor: {
-          include: {
-            user: true,
-          },
-        },
-        schoolSupervisor: {
-          include: {
-            user: true,
-          },
-        },
-      },
-    });
-
-    if (!logbook) {
-      return NextResponse.json(
-        { error: "No active logbook found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ logbook });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching logbook:", error);
-    return NextResponse.json(
-      { error: error.message || "An error occurred" },
-      { status: 500 }
-    );
+    return internalServerError("An error occurred", error);
   }
 }

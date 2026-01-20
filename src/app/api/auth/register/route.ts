@@ -1,95 +1,45 @@
-import { NextRequest, NextResponse } from "next/server";
-import { hash } from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { UserRole } from "@prisma/client";
+import {
+  badRequestError,
+  conflictError,
+  createdResponse,
+  internalServerError,
+} from "@/lib/utils";
+import { registerStudent } from "@/services/student";
+import { NextRequest } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const {
-      matricNumber,
-      password,
-      state,
-      firstName,
-      lastName,
-      middleName,
-      phoneNumber,
-      faculty,
-      department,
-      course,
-      level,
-      semester,
-      session,
-    } = body;
 
-    // Validate required fields
-    if (!matricNumber || !password || !state || !firstName || !lastName) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ matricNumber }],
-      },
+    const result = await registerStudent({
+      matricNumber: body.matricNumber,
+      password: body.password,
+      state: body.state,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      middleName: body.middleName,
+      phoneNumber: body.phoneNumber,
+      faculty: body.faculty,
+      department: body.department,
+      course: body.course,
+      level: body.level,
+      semester: body.semester,
+      session: body.session,
     });
 
-    if (existingUser) {
-      return NextResponse.json(
-        { error: "User with this matric number already exists" },
-        { status: 400 }
-      );
+    if (!result.success) {
+      if (result.code === "MISSING_FIELDS") {
+        return badRequestError(result.error!);
+      }
+      if (result.code === "USER_EXISTS") {
+        return conflictError(result.error!);
+      }
+      return internalServerError(result.error);
     }
 
-    // Hash password
-    const hashedPassword = await hash(password, 10);
-
-    // Create user and student profile
-    const user = await prisma.user.create({
-      data: {
-        matricNumber,
-        password: hashedPassword,
-        state,
-        role: UserRole.STUDENT,
-        student: {
-          create: {
-            firstName,
-            lastName,
-            middleName: middleName || null,
-            phoneNumber: phoneNumber || null,
-            faculty,
-            department,
-            course,
-            level,
-            semester,
-            session,
-          },
-        },
-      },
-      include: {
-        student: true,
-      },
-    });
-
-    return NextResponse.json(
-      {
-        message: "Registration successful",
-        user: {
-          id: user.id,
-          matricNumber: user.matricNumber,
-          role: user.role,
-        },
-      },
-      { status: 201 }
-    );
-  } catch (error: any) {
+    return createdResponse(result.user, "Registration successful");
+  } catch (error: unknown) {
     console.error("Registration error:", error);
-    return NextResponse.json(
-      { error: error.message || "An error occurred during registration" },
-      { status: 500 }
-    );
+    return internalServerError("An error occurred during registration", error);
   }
 }

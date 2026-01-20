@@ -1,108 +1,43 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/auth";
+import {
+  internalServerError,
+  notFoundError,
+  unauthorizedError,
+} from "@/lib/utils";
+import { generateStudentLogbookPDF } from "@/services/pdf";
 import { UserRole } from "@prisma/client";
-import { generateLogbookPDF } from "@/lib/pdf-generator";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
 
     if (!session?.user || session.user.role !== UserRole.STUDENT) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedError();
     }
 
-    const student = await prisma.student.findUnique({
-      where: { userId: session.user.id },
-      include: {
-        user: true,
-      },
+    const result = await generateStudentLogbookPDF({
+      studentUserId: session.user.id,
     });
 
-    if (!student) {
-      return NextResponse.json({ error: "Student not found" }, { status: 404 });
+    if (!result.success) {
+      if (result.code === "STUDENT_NOT_FOUND") {
+        return notFoundError("Student");
+      }
+      if (result.code === "NO_ACTIVE_LOGBOOK") {
+        return notFoundError("Active logbook");
+      }
+      return internalServerError(result.error);
     }
 
-    const logbook = await prisma.logbook.findFirst({
-      where: {
-        studentId: student.id,
-        isActive: true,
-      },
-      include: {
-        entries: {
-          orderBy: [{ weekNumber: "asc" }, { date: "asc" }],
-        },
-        weeklyReports: {
-          orderBy: { weekNumber: "asc" },
-        },
-        industrySupervisor: true,
-      },
-    });
-
-    if (!logbook) {
-      return NextResponse.json(
-        { error: "No active logbook found" },
-        { status: 404 }
-      );
-    }
-
-    const pdfData = {
-      student: {
-        firstName: student.firstName,
-        lastName: student.lastName,
-        middleName: student.middleName || undefined,
-        matricNumber: session.user.matricNumber || "",
-        faculty: student.faculty,
-        department: student.department,
-        course: student.course,
-        level: student.level,
-        session: student.session,
-      },
-      logbook: {
-        companyName: logbook.companyName,
-        companyAddress: logbook.companyAddress,
-        companyState: logbook.companyState,
-        startDate: logbook.startDate,
-        endDate: logbook.endDate,
-      },
-      entries: logbook.entries.map((entry) => ({
-        weekNumber: entry.weekNumber,
-        dayOfWeek: entry.dayOfWeek,
-        date: entry.date,
-        description: entry.description,
-        skillsLearned: entry.skillsLearned || undefined,
-      })),
-      weeklyReports: logbook.weeklyReports.map((report) => ({
-        weekNumber: report.weekNumber,
-        studentSummary: report.studentSummary || "",
-        industrySupervisorComment: report.industrySupervisorComment || undefined,
-        schoolSupervisorComment: report.schoolSupervisorComment || undefined,
-      })),
-      industrySupervisor: logbook.industrySupervisor
-        ? {
-            firstName: logbook.industrySupervisor.firstName,
-            lastName: logbook.industrySupervisor.lastName,
-            company: logbook.industrySupervisor.company,
-            position: logbook.industrySupervisor.position,
-          }
-        : undefined,
-    };
-
-    const pdf = generateLogbookPDF(pdfData);
-    const pdfBuffer = pdf.output("arraybuffer");
-
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(result.pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="SIWES_Logbook_${student.matricNumber}.pdf"`,
+        "Content-Disposition": `attachment; filename="${result.filename}"`,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("PDF generation error:", error);
-    return NextResponse.json(
-      { error: error.message || "An error occurred while generating PDF" },
-      { status: 500 }
-    );
+    return internalServerError("An error occurred while generating PDF", error);
   }
 }

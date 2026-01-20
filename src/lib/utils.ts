@@ -155,3 +155,204 @@ export async function validateRequestSafe<TBody = unknown, TQuery = unknown>(
     data: validated,
   };
 }
+
+// ============================================================
+// Standardized API Response Utilities
+// ============================================================
+
+interface ErrorResponseOptions {
+  message: string;
+  status?: number;
+  code?: string;
+  details?: unknown;
+  fields?: Array<{ path: string; message: string }>;
+}
+
+interface SuccessResponseOptions<T = unknown> {
+  data?: T;
+  message?: string;
+  status?: number;
+  meta?: Record<string, unknown>;
+}
+
+/**
+ * Creates a standardized error response
+ */
+export function errorResponse({
+  message,
+  status = 500,
+  code,
+  details,
+  fields,
+}: ErrorResponseOptions) {
+  const errorObj: {
+    code: string;
+    message: string;
+    details?: unknown;
+    fields?: Array<{ path: string; message: string }>;
+  } = {
+    code: code || `ERROR_${status}`,
+    message,
+  };
+
+  if (details !== undefined) {
+    errorObj.details = details;
+  }
+  if (fields) {
+    errorObj.fields = fields;
+  }
+
+  return NextResponse.json(
+    {
+      success: false,
+      error: errorObj,
+    },
+    { status },
+  );
+}
+
+/**
+ * Creates a standardized success response
+ */
+export function successResponse<T = unknown>({
+  data,
+  message,
+  status = 200,
+  meta,
+}: SuccessResponseOptions<T>) {
+  return NextResponse.json(
+    {
+      success: true,
+      ...(data !== undefined && { data }),
+      ...(message && { message }),
+      ...(meta && { meta }),
+    },
+    { status },
+  );
+}
+
+/**
+ * Creates a validation error response (400)
+ */
+export function validationError(
+  errors: Array<{ path: string; message: string }>,
+  message = "Validation failed",
+) {
+  return errorResponse({
+    message,
+    status: 400,
+    code: "VALIDATION_ERROR",
+    fields: errors,
+  });
+}
+
+/**
+ * Creates an unauthorized error response (401)
+ */
+export function unauthorizedError(message = "Unauthorized") {
+  return errorResponse({
+    message,
+    status: 401,
+    code: "UNAUTHORIZED",
+  });
+}
+
+/**
+ * Creates a forbidden error response (403)
+ */
+export function forbiddenError(message = "Forbidden") {
+  return errorResponse({
+    message,
+    status: 403,
+    code: "FORBIDDEN",
+  });
+}
+
+/**
+ * Creates a not found error response (404)
+ */
+export function notFoundError(resource: string) {
+  return errorResponse({
+    message: `${resource} not found`,
+    status: 404,
+    code: "NOT_FOUND",
+  });
+}
+
+/**
+ * Creates a rate limit error response (429)
+ */
+export function rateLimitError(retryAfter: number) {
+  const response = errorResponse({
+    message: "Too many requests. Please try again later.",
+    status: 429,
+    code: "RATE_LIMIT_EXCEEDED",
+    details: { retryAfter },
+  });
+
+  response.headers.set("Retry-After", retryAfter.toString());
+  response.headers.set("X-RateLimit-Retry-After", retryAfter.toString());
+
+  return response;
+}
+
+/**
+ * Creates a created response (201)
+ */
+export function createdResponse<T = unknown>(
+  data: T,
+  message = "Resource created successfully",
+) {
+  return successResponse({
+    data,
+    message,
+    status: 201,
+  });
+}
+
+/**
+ * Creates a conflict error response (409)
+ */
+export function conflictError(message: string) {
+  return errorResponse({
+    message,
+    status: 409,
+    code: "CONFLICT",
+  });
+}
+
+/**
+ * Creates a bad request error response (400)
+ */
+export function badRequestError(message: string, details?: unknown) {
+  return errorResponse({
+    message,
+    status: 400,
+    code: "BAD_REQUEST",
+    details,
+  });
+}
+
+/**
+ * Creates an internal server error response (500)
+ */
+export function internalServerError(
+  message = "An unexpected error occurred",
+  details?: unknown,
+) {
+  // Log the error details for debugging
+  if (details) {
+    console.error("Internal server error:", details);
+  }
+
+  return errorResponse({
+    message,
+    status: 500,
+    code: "INTERNAL_SERVER_ERROR",
+    // Don't expose internal details in production
+    details:
+      process.env.NODE_ENV === "development" && details !== undefined
+        ? details
+        : undefined,
+  });
+}

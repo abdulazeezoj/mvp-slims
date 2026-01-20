@@ -1,9 +1,10 @@
+import prisma from "@/lib/prisma";
+import { UserRole } from "@prisma/client";
+import { compare } from "bcryptjs";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
-import { compare } from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { UserRole } from "@prisma/client";
+import { headers } from "next/headers";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -12,10 +13,6 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
-    async validatePassword({ password, user }) {
-      // Custom password validation logic
-      return await compare(password, user.password);
-    },
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
@@ -30,7 +27,6 @@ export const auth = betterAuth({
       matricNumber: {
         type: "string",
         required: false,
-        unique: true,
       },
       state: {
         type: "string",
@@ -41,16 +37,13 @@ export const auth = betterAuth({
         required: true,
         defaultValue: "STUDENT",
       },
+      password: {
+        type: "string",
+        required: true,
+      },
     },
-    modelName: "User",
   },
   plugins: [nextCookies()],
-  advanced: {
-    generateId: () => {
-      // Use default ID generation
-      return undefined;
-    },
-  },
 });
 
 export type Session = typeof auth.$Infer.Session.session & {
@@ -63,6 +56,12 @@ export type Session = typeof auth.$Infer.Session.session & {
     profile?: any;
   };
 };
+
+export async function getSession() {
+  return await auth.api.getSession({
+    headers: await headers(),
+  });
+}
 
 // Helper function to get session with profile data
 export async function getSessionWithProfile() {
