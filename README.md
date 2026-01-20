@@ -37,13 +37,15 @@ training while providing real-time oversight for both school and industry superv
 ## 🛠 Technology Stack
 
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript
-- **UI Framework**: Shadcn UI, Tailwind CSS
+- **UI Framework**: Shadcn UI, Tailwind CSS v4 (CSS-first configuration)
 - **Backend**: Next.js API Routes, Server Actions
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: NextAuth.js v5 (Beta)
 - **Email Service**: Nodemailer
 - **PDF Generation**: jsPDF with autoTable
 - **Diagram Editor**: Draw.io embedded integration
+- **Security**: CSRF Protection, Rate Limiting middlewares
+- **Validation**: Zod schema validation with type-safe helpers
 
 ## 📋 Prerequisites
 
@@ -172,6 +174,34 @@ Administrators can:
 - View system-wide statistics
 - Manage user accounts
 
+## 🛡 Security Features
+
+### CSRF Protection
+- Automatic token generation and validation
+- SameSite cookie protection
+- Configurable token expiry (15 minutes default)
+- Exempt routes for webhooks and public APIs
+
+### Rate Limiting
+- Per-client request throttling (100 requests/minute default)
+- Automatic cleanup of expired entries
+- Rate limit headers in responses
+- Configurable exemptions for health checks
+
+### Request Validation
+- Type-safe Zod schema validation
+- Automatic error formatting
+- Body and query parameter validation
+- Safe parsing with detailed error messages
+
+### Middleware Architecture
+All middlewares are located in `src/middlewares/` and can be composed together:
+- `csrfMiddleware` - CSRF token validation
+- `rateLimitMiddleware` - Rate limiting
+- Custom middlewares can be easily added
+
+See `src/middlewares/README.md` for detailed documentation.
+
 ## 📱 Key User Journeys
 
 ### Student Journey
@@ -207,14 +237,33 @@ mvp-slims/
 │   │   ├── auth.ts           # NextAuth configuration
 │   │   ├── prisma.ts         # Prisma client
 │   │   ├── email.ts          # Email service
-│   │   └── pdf-generator.ts # PDF generation
+│   │   ├── pdf-generator.ts # PDF generation
+│   │   └── utils.ts          # Validation & helpers
+│   ├── middlewares/           # Custom middlewares
+│   │   ├── csrf.ts           # CSRF protection
+│   │   ├── rate-limit.ts     # Rate limiting
+│   │   └── README.md         # Middleware docs
 │   └── types/                 # TypeScript types
 ├── prisma/
 │   └── schema.prisma         # Database schema
 ├── public/
 │   └── uploads/              # User uploads
+├── proxy.ts                   # Next.js 16 proxy file
 └── package.json
 ```
+
+### Key Architecture Changes (Next.js 16 & Tailwind v4)
+
+**Next.js 16:**
+- `middleware.ts` → `proxy.ts` (network boundary proxy)
+- Function renamed from `middleware` to `proxy`
+- Runs on Node.js runtime (not Edge)
+
+**Tailwind CSS v4:**
+- CSS-first configuration using `@theme` directive
+- No more `tailwind.config.ts` file
+- Theme defined directly in `globals.css`
+- Plugins imported via `@plugin` directive
 
 ## 🧪 Testing
 
