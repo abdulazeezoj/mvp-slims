@@ -1,11 +1,11 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Session } from "@/lib/auth";
+import { authClient } from "@/lib/auth-client";
+import { BookOpen, FileText, Home, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
-import { Button } from "@/components/ui/button";
-import { BookOpen, FileText, LogOut, Home } from "lucide-react";
-import { Session } from "next-auth";
 
 interface DashboardNavProps {
   session: Session;
@@ -50,7 +50,8 @@ export function DashboardNav({ session }: DashboardNavProps) {
           <div className="flex items-center gap-4">
             <div className="text-sm">
               <p className="font-medium">
-                {session.user.profile?.firstName} {session.user.profile?.lastName}
+                {session.user.profile?.firstName}{" "}
+                {session.user.profile?.lastName}
               </p>
               <p className="text-xs text-muted-foreground">
                 {session.user.matricNumber}
@@ -59,7 +60,13 @@ export function DashboardNav({ session }: DashboardNavProps) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={() =>
+                authClient.signOut({
+                  fetchOptions: {
+                    onSuccess: () => (window.location.href = "/"),
+                  },
+                })
+              }
               title="Sign out"
             >
               <LogOut className="h-4 w-4" />

@@ -353,7 +353,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 For support and questions:
-- Email: siwes@abu.edu.ng
+- Email: contact@abu.edu.ng
 - Website: https://abu.edu.ng
 
 ---

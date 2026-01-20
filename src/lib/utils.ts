@@ -1,7 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
+import { NextRequest, NextResponse } from "next/server";
 import { twMerge } from "tailwind-merge";
 import { z } from "zod";
-import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Merges Tailwind CSS classes with proper override handling
@@ -21,7 +21,7 @@ export async function validateRequest<TBody = unknown, TQuery = unknown>(
   schemas: {
     body?: z.ZodSchema<TBody>;
     query?: z.ZodSchema<TQuery>;
-  }
+  },
 ) {
   try {
     const validated: {
@@ -42,9 +42,11 @@ export async function validateRequest<TBody = unknown, TQuery = unknown>(
             {
               error: "Invalid JSON in request body",
               details:
-                jsonError instanceof Error ? jsonError.message : "Unknown error",
+                jsonError instanceof Error
+                  ? jsonError.message
+                  : "Unknown error",
             },
-            { status: 400 }
+            { status: 400 },
           ),
         };
       }
@@ -69,12 +71,12 @@ export async function validateRequest<TBody = unknown, TQuery = unknown>(
         error: NextResponse.json(
           {
             error: "Validation failed",
-            errors: error.errors.map((err) => ({
+            errors: error.issues.map((err) => ({
               path: err.path.join("."),
               message: err.message,
             })),
           },
-          { status: 400 }
+          { status: 400 },
         ),
       };
     }
@@ -85,7 +87,7 @@ export async function validateRequest<TBody = unknown, TQuery = unknown>(
       success: false as const,
       error: NextResponse.json(
         { error: "Internal server error" },
-        { status: 500 }
+        { status: 500 },
       ),
     };
   }
@@ -100,7 +102,7 @@ export async function validateRequestSafe<TBody = unknown, TQuery = unknown>(
   schemas: {
     body?: z.ZodSchema<TBody>;
     query?: z.ZodSchema<TQuery>;
-  }
+  },
 ) {
   const validated: {
     body?: TBody;
@@ -144,7 +146,7 @@ export async function validateRequestSafe<TBody = unknown, TQuery = unknown>(
   if (errors.length > 0) {
     return {
       success: false as const,
-      errors: errors.flatMap((e) => e.errors),
+      errors: errors.flatMap((e) => e.issues),
     };
   }
 

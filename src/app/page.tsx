@@ -1,14 +1,12 @@
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-50 to-indigo-100">
+    <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-linear-to-br from-blue-50 to-indigo-100">
       <div className="max-w-4xl mx-auto text-center space-y-8">
         <div className="space-y-4">
-          <h1 className="text-5xl font-bold text-gray-900">
-            SLIMS
-          </h1>
+          <h1 className="text-5xl font-bold text-gray-900">SLIMS</h1>
           <p className="text-xl text-gray-600">
             SIWES Logbook & Internship Management System
           </p>
@@ -22,8 +20,8 @@ export default function Home() {
             Welcome to Your Digital SIWES Logbook
           </h2>
           <p className="text-gray-600">
-            A streamlined platform for managing your industrial training experience,
-            daily entries, sketches, and supervisor interactions.
+            A streamlined platform for managing your industrial training
+            experience, daily entries, sketches, and supervisor interactions.
           </p>
 
           <div className="grid md:grid-cols-2 gap-4 pt-4">
