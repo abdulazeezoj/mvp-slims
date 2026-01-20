@@ -37,13 +37,15 @@ training while providing real-time oversight for both school and industry superv
 ## 🛠 Technology Stack
 
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript
-- **UI Framework**: Shadcn UI, Tailwind CSS
+- **UI Framework**: Shadcn UI, Tailwind CSS v4 (CSS-first configuration)
 - **Backend**: Next.js API Routes, Server Actions
 - **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: NextAuth.js v5 (Beta)
+- **Authentication**: Better Auth (framework-agnostic auth for modern web apps)
 - **Email Service**: Nodemailer
 - **PDF Generation**: jsPDF with autoTable
 - **Diagram Editor**: Draw.io embedded integration
+- **Security**: CSRF Protection, Rate Limiting middlewares
+- **Validation**: Zod schema validation with type-safe helpers
 
 ## 📋 Prerequisites
 
@@ -80,9 +82,9 @@ Update the following variables in `.env`:
 # Database
 DATABASE_URL="postgresql://user:password@localhost:5432/slims_db?schema=public"
 
-# NextAuth
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="your-secret-key-here"
+# Better Auth
+BETTER_AUTH_SECRET="your-secret-key-here"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
 # Email Configuration
 EMAIL_SERVER_HOST="smtp.gmail.com"
@@ -134,18 +136,42 @@ Visit [http://localhost:3000](http://localhost:3000) to view the application.
 - `SCHOOL_SUPERVISOR`: ABU lecturers
 - `ADMIN`: System administrators
 
-## 🔐 Authentication Flow
+## 🔐 Authentication with Better Auth
 
-### Students
+SLIMS uses [Better Auth](https://www.better-auth.com/) - a modern, framework-agnostic authentication library that provides:
+- 🔒 Secure session management with JWT
+- 🎯 Custom authentication flows (matric number + state validation)
+- 🔌 Prisma adapter for seamless database integration
+- 🍪 Automatic cookie handling with Next.js
+- 📱 Type-safe client and server APIs
+
+### Why Better Auth?
+
+- **Framework-agnostic**: Works across React, Next.js, and other frameworks
+- **Modern Architecture**: Built for App Router and server components
+- **Custom Authentication**: Supports unique flows like matric number + state validation
+- **Better TypeScript**: Full type inference without manual declaration merging
+- **Maintained**: Actively developed with regular updates
+
+### Authentication Flow
+
+#### Students
 1. Sign up with Matric Number, State, and Password
 2. Complete profile with academic information
 3. Create logbook with company details
 4. Add industry supervisor information
 
-### Supervisors
+#### Supervisors
 1. Auto-created when student adds them to logbook
 2. Receive email with login credentials
 3. Access review interface via email links
+
+### Custom Authentication
+
+SLIMS implements custom authentication logic for student login:
+- Validates matric number against database
+- Verifies state of origin for added security
+- Creates session using Better Auth's session management
 
 ## 📧 Email Notifications
 
@@ -171,6 +197,34 @@ Administrators can:
 - Assign school supervisors to students
 - View system-wide statistics
 - Manage user accounts
+
+## 🛡 Security Features
+
+### CSRF Protection
+- Automatic token generation and validation
+- SameSite cookie protection
+- Configurable token expiry (15 minutes default)
+- Exempt routes for webhooks and public APIs
+
+### Rate Limiting
+- Per-client request throttling (100 requests/minute default)
+- Automatic cleanup of expired entries
+- Rate limit headers in responses
+- Configurable exemptions for health checks
+
+### Request Validation
+- Type-safe Zod schema validation
+- Automatic error formatting
+- Body and query parameter validation
+- Safe parsing with detailed error messages
+
+### Middleware Architecture
+All middlewares are located in `src/middlewares/` and can be composed together:
+- `csrfMiddleware` - CSRF token validation
+- `rateLimitMiddleware` - Rate limiting
+- Custom middlewares can be easily added
+
+See `src/middlewares/README.md` for detailed documentation.
 
 ## 📱 Key User Journeys
 
@@ -207,14 +261,33 @@ mvp-slims/
 │   │   ├── auth.ts           # NextAuth configuration
 │   │   ├── prisma.ts         # Prisma client
 │   │   ├── email.ts          # Email service
-│   │   └── pdf-generator.ts # PDF generation
+│   │   ├── pdf-generator.ts # PDF generation
+│   │   └── utils.ts          # Validation & helpers
+│   ├── middlewares/           # Custom middlewares
+│   │   ├── csrf.ts           # CSRF protection
+│   │   ├── rate-limit.ts     # Rate limiting
+│   │   └── README.md         # Middleware docs
 │   └── types/                 # TypeScript types
 ├── prisma/
 │   └── schema.prisma         # Database schema
 ├── public/
 │   └── uploads/              # User uploads
+├── proxy.ts                   # Next.js 16 proxy file
 └── package.json
 ```
+
+### Key Architecture Changes (Next.js 16 & Tailwind v4)
+
+**Next.js 16:**
+- `middleware.ts` → `proxy.ts` (network boundary proxy)
+- Function renamed from `middleware` to `proxy`
+- Runs on Node.js runtime (not Edge)
+
+**Tailwind CSS v4:**
+- CSS-first configuration using `@theme` directive
+- No more `tailwind.config.ts` file
+- Theme defined directly in `globals.css`
+- Plugins imported via `@plugin` directive
 
 ## 🧪 Testing
 

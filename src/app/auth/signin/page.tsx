@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -23,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { State } from "@prisma/client";
+import { authClient } from "@/lib/auth-client";
 
 const NIGERIAN_STATES = Object.values(State);
 
@@ -42,15 +42,23 @@ export default function SignInPage() {
     setError("");
 
     try {
-      const result = await signIn("credentials", {
-        identifier: formData.matricNumber,
-        password: formData.password,
-        state: formData.state,
-        redirect: false,
+      // Custom authentication endpoint for matric number + state
+      const response = await fetch("/api/auth/signin-custom", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          matricNumber: formData.matricNumber,
+          password: formData.password,
+          state: formData.state,
+        }),
       });
 
-      if (result?.error) {
-        setError(result.error);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Sign in failed");
       } else {
         router.push("/dashboard");
         router.refresh();
